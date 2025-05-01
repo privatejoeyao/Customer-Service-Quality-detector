@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>克服審查系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    textarea:focus {
+      outline: none;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body class="bg-[#1a1a1a] text-white min-h-screen">
+  <!-- 首頁選單 -->
+  <div id="homeMenu" class="flex flex-col items-center justify-center h-screen space-y-6">
+    <h1 class="text-3xl font-bold">克服審查系統</h1>
+    <div class="space-x-4">
+      <button onclick="showSection('upload')" class="px-6 py-2 bg-blue-500 rounded-xl hover:bg-blue-600">上傳文件</button>
+      <button onclick="showSection('copy')" class="px-6 py-2 bg-green-500 rounded-xl hover:bg-green-600">貼上文字</button>
+    </div>
+  </div>
+
+  <!-- 主畫面 -->
+  <div id="copySection" class="hidden flex flex-col w-full h-screen">
+    <!-- 上方工具列 -->
+    <div class="flex items-start p-3 space-x-4 bg-[#1a1a1a]">
+
+      <!-- 客服名稱 -->
+      <input id="agentNameInput" type="text" placeholder="客服" class="h-10 px-2 py-2 w-20 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600">
+
+      <!-- 輸入區塊 -->
+      <textarea id="copyInput" placeholder="貼上內容..." class="h-10 w-72 p-2 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 resize-none"></textarea>
+
+      <!-- 操作按鈕們 -->
+      <button onclick="generateCombinedOutput()" class="h-10 min-w-[120px] px-4 py-2 rounded" style="background-color:#4ade80;">生成</button>
+      <button onclick="copyText('formattedOutput')" class="h-10 min-w-[120px] px-4 py-2 rounded" style="background-color:#fbbf24;">複製文檔</button>
+      <button onclick="copyText('violationOutput')" class="h-10 min-w-[120px] px-4 py-2 rounded" style="background-color:#a78bfa;">複製違規內容</button>
+
+      <!-- 違規顯示 -->
+      <div class="ml-auto">
+        <button onclick="toggleViolationDetail()" class="h-10 min-w-[120px] px-4 py-2 rounded" style="background-color:#f87171;" id="violationTitle">⚠️ 無資料</button>
+      </div>
+    </div>
+
+    <!-- 輸出區 -->
+    <div class="flex-1 relative mt-2">
+      <textarea id="formattedOutput" readonly class="w-full h-[95%] bg-[#1a1a1a] p-4 text-white text-sm leading-tight whitespace-pre-wrap"></textarea>
+
+      <!-- 違規詳情浮層 -->
+      <div id="violationDetail" class="absolute top-4 right-4 bg-white text-red-600 p-4 rounded shadow hidden w-96 max-h-[60%] overflow-auto">
+        <h2 class="font-semibold text-black mb-2">違規詳細</h2>
+        <textarea id="violationOutput" readonly class="w-full h-48 bg-red-100 p-2 rounded text-sm whitespace-pre-wrap leading-tight"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showSection(section) {
+      document.getElementById("homeMenu").style.display = "none";
+      document.getElementById("copySection").style.display = "flex";
+    }
+
+    function toggleViolationDetail() {
+      const detail = document.getElementById("violationDetail");
+      detail.classList.toggle("hidden");
+    }
+
+    function copyText(id) {
+      const text = document.getElementById(id).value;
+      navigator.clipboard.writeText(text).then(() => alert("已複製"));
+    }
+
+    function generateCombinedOutput() {
+      const input = document.getElementById("copyInput").value.trim();
+      const agentName = document.getElementById("agentNameInput").value.trim();
+      const lines = input.split("\n");
+      let formatted = "";
+      let lastRole = "";
+      const allMessages = [];
+
+      lines.forEach((line) => {
+        if (!line.trim()) return;
+        const timeMatch = line.match(/^\[(\d{2}):(\d{2}):(\d{2})\]/);
+        if (!timeMatch) return;
+        const [_, h, m, s] = timeMatch;
+        const nameMatch = line.match(/\[\d{2}:\d{2}:\d{2}\]\s*(.*?):/);
+        const name = nameMatch ? nameMatch[1] : "";
+        const role = agentName
+          ? (name === agentName ? "AGENT" : "USER")
+          : (/^[\u4e00-\u9fa5]+$/.test(name) ? "AGENT" : name ? "USER" : "USER");
+
+        const time = parseInt(h) * 3600 + parseInt(m) * 60 + parseInt(s);
+        allMessages.push({ time, name, role, line });
+
+        if (lastRole && role !== lastRole) formatted += "\n";
+        formatted += line + "\n";
+        lastRole = role;
+      });
+
+      const userIndex = allMessages.findIndex(msg => msg.role === "USER");
+      if (userIndex === -1) {
+        document.getElementById("formattedOutput").value = formatted;
+        document.getElementById("violationTitle").textContent = "⚠️ 找不到使用者發言";
+        document.getElementById("violationOutput").value = "";
+        return;
+      }
+
+      const startMsg = allMessages[userIndex];
+      const agentMsg = allMessages.slice(userIndex + 1).find(msg => msg.role === "AGENT");
+
+      if (agentMsg) {
+        const delay = agentMsg.time - startMsg.time;
+        if (delay > 60) {
+          document.getElementById("violationTitle").textContent = `⚠️ 首次超時回覆 ${delay} 秒`;
+          const conversation = allMessages
+            .slice(userIndex, allMessages.indexOf(agentMsg) + 1)
+            .map(msg => msg.line)
+            .join("\n");
+          document.getElementById("violationOutput").value = conversation;
+        } else {
+          document.getElementById("violationTitle").textContent = "✅ 無違規";
+          document.getElementById("violationOutput").value = "";
+        }
+      } else {
+        document.getElementById("violationTitle").textContent = "⚠️ 未偵測到客服回覆";
+        document.getElementById("violationOutput").value = "";
+      }
+
+      document.getElementById("formattedOutput").value = formatted;
+    }
+  </script>
+</body>
+</html>
