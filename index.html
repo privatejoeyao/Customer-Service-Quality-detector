@@ -29,6 +29,7 @@
       <input id="agentNameInput" type="text" placeholder="客服" class="h-10 px-2 py-2 w-20 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600">
       <textarea id="copyInput" placeholder="貼上內容..." class="h-10 w-72 p-2 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 resize-none"></textarea>
       <button onclick="generateCombinedOutput()" class="h-10 min-w-[120px] px-4 py-2 rounded" style="background-color:#4ade80;">生成</button>
+      <button onclick="clearAll()" class="h-10 min-w-[120px] px-4 py-2 rounded bg-gray-600 hover:bg-gray-700">清空</button>
       <button onclick="copyText('formattedOutput')" class="h-10 min-w-[120px] px-4 py-2 rounded" style="background-color:#fbbf24;">複製文檔</button>
       <button onclick="copyText('violationOutput')" class="h-10 min-w-[120px] px-4 py-2 rounded" style="background-color:#a78bfa;">複製違規內容</button>
       <div class="ml-auto">
@@ -60,6 +61,17 @@
     function copyText(id) {
       const text = document.getElementById(id).value;
       navigator.clipboard.writeText(text).then(() => alert("已複製"));
+    }
+
+    function clearAll() {
+      document.getElementById("agentNameInput").value = "";
+      document.getElementById("copyInput").value = "";
+      document.getElementById("formattedOutput").value = "";
+      document.getElementById("violationOutput").value = "";
+      const titleButton = document.getElementById("violationTitle");
+      titleButton.textContent = "無資料";
+      titleButton.style.fontSize = "1rem";
+      document.getElementById("violationDetail").classList.add("hidden");
     }
 
     function formatTime(t) {
@@ -180,9 +192,8 @@
         const titleButton = document.getElementById("violationTitle");
         titleButton.textContent = violations.join("\n");
 
-        // 根據行數縮放字體
         const lineCount = violations.length;
-        const baseFontSize = 1.0; // rem
+        const baseFontSize = 1.0;
         const newFontSize = Math.max(0.7, baseFontSize - (lineCount - 1) * 0.07);
         titleButton.style.fontSize = `${newFontSize}rem`;
 
