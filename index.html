@@ -39,9 +39,37 @@
       transition: opacity 1s ease-in-out;
       z-index: 9999;
     }
+
+    /* EVA警告動畫 */
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .animate-blink {
+      animation: blink 1s step-start infinite;
+    }
+
+    .animate-fade-in {
+      animation: fade-in 0.4s ease-out;
+    }
   </style>
 </head>
 <body class="bg-[#1a1a1a] text-white min-h-screen">
+
+  <!-- EVA風格違規彈窗 -->
+  <div id="evaAlert" class="fixed inset-0 bg-red-900 bg-opacity-80 flex items-center justify-center z-[9999] hidden">
+    <div class="bg-black border-4 border-red-600 p-8 rounded-lg shadow-lg w-[90%] max-w-md text-center animate-fade-in">
+      <div class="text-white text-3xl font-extrabold mb-6 animate-blink">違規注意</div>
+      <button onclick="closeEvaAlert()" class="mt-4 px-6 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-700 mx-auto block">確認</button>
+    </div>
+  </div>
+
   <div id="homeMenu" class="flex flex-col items-center justify-center h-screen space-y-6">
     <h1 class="text-3xl font-bold">客服審查系統</h1>
     <div class="space-x-4">
@@ -61,10 +89,9 @@
       <button onclick="toggleViolationDetail()" id="violationTitle">無資料</button>
     </div>
 
-    <!-- ✅ 修正後的區塊 -->
     <div class="flex-1 relative mt-2 overflow-hidden">
-      <div id="formattedOutput" class="absolute inset-0 bg-[#1a1a1a] p-4 text-white text-sm leading-tight whitespace-pre-wrap overflow-auto"></div>
-      <div id="violationDetail" class="absolute top-4 right-4 bg-white text-red-600 p-4 rounded shadow hidden w-96 max-h-[60%] overflow-auto z-10">
+      <div id="formattedOutput" class="w-full h-[95%] bg-[#1a1a1a] p-4 text-white text-sm leading-tight whitespace-pre-wrap overflow-auto"></div>
+      <div id="violationDetail" class="absolute top-4 right-4 bg-white text-red-600 p-4 rounded shadow hidden w-96 max-h-[60%] overflow-auto">
         <h2 class="font-semibold text-black mb-2">違規詳細</h2>
         <div id="violationOutput" class="space-y-2"></div>
       </div>
@@ -127,6 +154,14 @@
       const m = String(Math.floor((t % 3600) / 60)).padStart(2, "0");
       const s = String(t % 60).padStart(2, "0");
       return `${h}:${m}:${s}`;
+    }
+
+    function showEvaAlert() {
+      document.getElementById("evaAlert").classList.remove("hidden");
+    }
+
+    function closeEvaAlert() {
+      document.getElementById("evaAlert").classList.add("hidden");
     }
 
     function generateCombinedOutput() {
@@ -258,7 +293,7 @@
       const titleButton = document.getElementById("violationTitle");
       const hasViolations = violationDetailEl.children.length > 0;
       titleButton.textContent = hasViolations ? "有違規" : "無資料";
-      if (hasViolations) alert("偵測到違規內容，請查看右側違規詳細");
+      if (hasViolations) showEvaAlert(); // 彈出EVA警告視窗
     }
   </script>
 </body>
