@@ -9,6 +9,7 @@
     textarea:focus {
       outline: none;
       box-shadow: none;
+      background-color: #1a1a1a;
     }
     #violationTitle {
       height: 40px;
@@ -24,10 +25,23 @@
       background-color: #f87171;
       overflow: hidden;
     }
+    .toast {
+      position: fixed;
+      top: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #34d399;
+      color: white;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      opacity: 1;
+      transition: opacity 1s ease-in-out;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body class="bg-[#1a1a1a] text-white min-h-screen">
-  <!-- 首頁選單 -->
   <div id="homeMenu" class="flex flex-col items-center justify-center h-screen space-y-6">
     <h1 class="text-3xl font-bold">客服審查系統</h1>
     <div class="space-x-4">
@@ -36,7 +50,6 @@
     </div>
   </div>
 
-  <!-- 主畫面 -->
   <div id="copySection" class="hidden flex flex-col w-full h-screen">
     <div class="flex items-start p-3 space-x-4 bg-[#1a1a1a]">
       <input id="agentNameInput" type="text" placeholder="客服" class="h-10 px-2 py-2 w-20 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600">
@@ -44,17 +57,15 @@
       <button onclick="generateCombinedOutput()" class="h-10 min-w-[120px] px-4 py-2 rounded transform scale-105" style="background-color:#4ade80;">生成</button>
       <button onclick="clearAll()" class="h-10 min-w-[120px] px-4 py-2 rounded transform scale-105 bg-gray-600 hover:bg-gray-700">清空</button>
       <button onclick="copyText('formattedOutput')" class="h-10 min-w-[120px] px-4 py-2 rounded transform scale-105" style="background-color:#fbbf24;">複製文檔</button>
-      <button onclick="copyText('violationOutput')" class="h-10 min-w-[120px] px-4 py-2 rounded transform scale-105" style="background-color:#a78bfa;">複製違規內容</button>
-      <div class="ml-auto">
-        <button onclick="toggleViolationDetail()" id="violationTitle">無資料</button>
-      </div>
+      <button onclick="copyViolationText()" class="h-10 min-w-[120px] px-4 py-2 rounded transform scale-105" style="background-color:#fb923c;">複製違規內容</button>
+      <button onclick="toggleViolationDetail()" id="violationTitle">無資料</button>
     </div>
 
     <div class="flex-1 relative mt-2">
-      <textarea id="formattedOutput" readonly class="w-full h-[95%] bg-[#1a1a1a] p-4 text-white text-sm leading-tight whitespace-pre-wrap"></textarea>
+      <div id="formattedOutput" class="w-full h-[95%] bg-[#1a1a1a] p-4 text-white text-sm leading-tight whitespace-pre-wrap overflow-auto"></div>
       <div id="violationDetail" class="absolute top-4 right-4 bg-white text-red-600 p-4 rounded shadow hidden w-96 max-h-[60%] overflow-auto">
         <h2 class="font-semibold text-black mb-2">違規詳細</h2>
-        <textarea id="violationOutput" readonly class="w-full h-48 bg-red-100 p-2 rounded text-sm whitespace-pre-wrap leading-tight"></textarea>
+        <div id="violationOutput" class="space-y-2"></div>
       </div>
     </div>
   </div>
@@ -70,17 +81,43 @@
     }
 
     function copyText(id) {
-      navigator.clipboard.writeText(document.getElementById(id).value).then(() => alert("已複製"));
+      const el = document.getElementById(id);
+      const text = el.innerText || el.value;
+      navigator.clipboard.writeText(text).then(showToast);
+    }
+
+    function copyViolationText() {
+      const detail = document.getElementById("violationOutput");
+      let collected = "";
+      detail.querySelectorAll("div").forEach(section => {
+        const lines = section.querySelectorAll("div.text-xs");
+        lines.forEach(line => {
+          collected += line.textContent + "\n";
+        });
+        collected += "\n";
+      });
+      if (collected.trim()) {
+        navigator.clipboard.writeText(collected.trim()).then(showToast);
+      }
+    }
+
+    function showToast() {
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.innerText = "已複製";
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 1000);
+      }, 1000);
     }
 
     function clearAll() {
       document.getElementById("agentNameInput").value = "";
       document.getElementById("copyInput").value = "";
-      document.getElementById("formattedOutput").value = "";
-      document.getElementById("violationOutput").value = "";
-      const titleButton = document.getElementById("violationTitle");
-      titleButton.textContent = "無資料";
-      titleButton.style.fontSize = "1rem";
+      document.getElementById("formattedOutput").innerHTML = "";
+      document.getElementById("violationOutput").innerHTML = "";
+      document.getElementById("violationTitle").textContent = "無資料";
       document.getElementById("violationDetail").classList.add("hidden");
     }
 
@@ -112,88 +149,115 @@
         }
       }
 
-      // 格式化顯示
+      const violations = [];
+      const violationDetailEl = document.getElementById("violationOutput");
+      violationDetailEl.innerHTML = "";
+      const violationKeySet = new Set();
+
+      const addViolation = (reason, messages) => {
+        const div = document.createElement("div");
+        div.className = "space-y-1 p-2 border-b border-gray-300";
+
+        const reasonEl = document.createElement("div");
+        reasonEl.textContent = reason;
+        reasonEl.className = "text-sm font-semibold text-teal-300";
+
+        const start = document.createElement("div");
+        start.textContent = messages[0];
+        start.className = "text-xs text-black";
+
+        const end = document.createElement("div");
+        end.textContent = messages[messages.length - 1];
+        end.className = "text-xs text-black";
+
+        const copyBtn = document.createElement("button");
+        copyBtn.textContent = "複製";
+        copyBtn.className = "text-xs text-white bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded ml-2";
+        copyBtn.onclick = () => {
+          const contentToCopy = `${messages[0]}\n${messages[messages.length - 1]}`;
+          navigator.clipboard.writeText(contentToCopy);
+          showToast();
+        };
+
+        div.append(reasonEl, start, end, copyBtn);
+        violationDetailEl.appendChild(div);
+
+        violationKeySet.add(messages[0]);
+        violationKeySet.add(messages[messages.length - 1]);
+      };
+
+      const firstUserIndex = allMessages.findIndex(m => m.role === "USER");
+      const firstAgentAfter = allMessages.slice(firstUserIndex + 1).find(m => m.role === "AGENT");
+      if (firstUserIndex !== -1 && firstAgentAfter) {
+        const delay = firstAgentAfter.time - allMessages[firstUserIndex].time;
+        if (delay > 60) {
+          const slice = allMessages.slice(firstUserIndex, allMessages.indexOf(firstAgentAfter) + 1);
+          const texts = slice.map(m => `[${formatTime(m.time)}] ${m.name}: ${m.content}`);
+          addViolation(`首次超時回覆：${delay} 秒`, texts);
+        }
+      }
+
+      let i = 0;
+      while (i < allMessages.length) {
+        if (allMessages[i].role === "USER") {
+          let startIdx = i;
+          while (i + 1 < allMessages.length && allMessages[i + 1].role === "USER") i++;
+          const endAgent = allMessages.slice(i + 1).find(m => m.role === "AGENT");
+          if (endAgent) {
+            const endIdx = allMessages.indexOf(endAgent);
+            const delay = endAgent.time - allMessages[startIdx].time;
+            if (delay > 240) {
+              const slice = allMessages.slice(startIdx, endIdx + 1);
+              const texts = slice.map(m => `[${formatTime(m.time)}] ${m.name}: ${m.content}`);
+              addViolation(`長時間未回覆：${delay} 秒`, texts);
+            }
+            i = endIdx;
+          } else {
+            break;
+          }
+        } else {
+          i++;
+        }
+      }
+
+      allMessages.forEach((msg, idx) => {
+        if (msg.role === "AGENT" && (msg.content.includes("3分钟") || msg.content.includes("5分钟"))) {
+          const nextAgent = allMessages.slice(idx + 1).find(m => m.role === "AGENT");
+          const waitLimit = msg.content.includes("3分钟") ? 180 : 300;
+          if (nextAgent && nextAgent.time - msg.time > waitLimit + 60) {
+            const delay = nextAgent.time - msg.time;
+            const texts = [
+              `[${formatTime(msg.time)}] ${msg.name}: ${msg.content}`,
+              `[${formatTime(nextAgent.time)}] ${nextAgent.name}: ${nextAgent.content}`
+            ];
+            addViolation(`長時間等待：${delay} 秒`, texts);
+          }
+        }
+      });
+
       let formatted = "";
       let lastRole = null;
       allMessages.forEach((msg, i) => {
-        const nextMsg = allMessages[i + 1];
-        const isNextDialogue = nextMsg && nextMsg.role !== "SYSTEM";
+        const key = `[${formatTime(msg.time)}] ${msg.name}: ${msg.content}`;
         if (msg.role === "SYSTEM") {
-          if (lastRole) formatted += "\n";
-          formatted += msg.content + "\n";
-          if (isNextDialogue) formatted += "\n";
+          if (lastRole) formatted += "<br/>";
+          formatted += `${msg.content}<br/><br/>`;
           lastRole = null;
         } else {
-          if (lastRole && lastRole !== msg.role) formatted += "\n";
-          formatted += `[${formatTime(msg.time)}] ${msg.name}: ${msg.content}\n`;
+          if (lastRole && lastRole !== msg.role) formatted += "<br/>";
+          const line = `[${formatTime(msg.time)}] ${msg.name}: ${msg.content}`;
+          formatted += violationKeySet.has(key)
+            ? `<span style="color:red;">${line}</span><br/>`
+            : `${line}<br/>`;
           lastRole = msg.role;
         }
       });
-      document.getElementById("formattedOutput").value = formatted.trim();
 
-      // 違規偵測
-      const violations = [];
-      let violationContent = "";
-
-      // 首次延遲
-      const firstUserIndex = allMessages.findIndex(m => m.role === "USER");
-      const firstAgentAfter = allMessages.slice(firstUserIndex + 1).find(m => m.role === "AGENT");
-      if (firstAgentAfter) {
-        const delay = firstAgentAfter.time - allMessages[firstUserIndex].time;
-        if (delay > 60) {
-          violations.push(`首次超時回覆 ${delay} 秒`);
-          violationContent += allMessages
-            .slice(firstUserIndex, allMessages.indexOf(firstAgentAfter) + 1)
-            .map(m => m.role === "SYSTEM" ? m.content : `[${formatTime(m.time)}] ${m.name}: ${m.content}`)
-            .join("\n") + "\n\n";
-        }
-      }
-
-      // 使用者長時間未回應
-      for (let i = 0; i < allMessages.length; i++) {
-        if (allMessages[i].role === "USER") {
-          const agentAfter = allMessages.slice(i + 1).find(m => m.role === "AGENT");
-          if (agentAfter && agentAfter.time - allMessages[i].time > 240) {
-            violations.push(`長時間未回覆 ${agentAfter.time - allMessages[i].time} 秒`);
-            violationContent += allMessages
-              .slice(i, allMessages.indexOf(agentAfter) + 1)
-              .map(m => m.role === "SYSTEM" ? m.content : `[${formatTime(m.time)}] ${m.name}: ${m.content}`)
-              .join("\n") + "\n\n";
-          }
-        }
-      }
-
-      // [3分鐘／5分鐘違規檢查]
-      allMessages.forEach((msg, idx) => {
-        if (msg.role === "AGENT" && msg.content.includes("3分钟")) {
-          const nextAgent = allMessages.slice(idx + 1).find(m => m.role === "AGENT");
-          if (nextAgent && nextAgent.time - msg.time > 240) {
-            violations.push(`3分钟承諾未履行：延遲 ${nextAgent.time - msg.time} 秒`);
-            violationContent += `[${formatTime(msg.time)}] ${msg.name}: ${msg.content}\n` +
-              `[${formatTime(nextAgent.time)}] ${nextAgent.name}: ${nextAgent.content}\n\n`;
-          }
-        }
-        if (msg.role === "AGENT" && msg.content.includes("5分钟")) {
-          const nextAgent = allMessages.slice(idx + 1).find(m => m.role === "AGENT");
-          if (nextAgent && nextAgent.time - msg.time > 360) {
-            violations.push(`5分钟承諾未履行：延遲 ${nextAgent.time - msg.time} 秒`);
-            violationContent += `[${formatTime(msg.time)}] ${msg.name}: ${msg.content}\n` +
-              `[${formatTime(nextAgent.time)}] ${nextAgent.name}: ${nextAgent.content}\n\n`;
-          }
-        }
-      });
-
-      // 更新畫面
+      document.getElementById("formattedOutput").innerHTML = formatted.trim();
       const titleButton = document.getElementById("violationTitle");
-      if (violations.length > 0) {
-        titleButton.textContent = violations.join("\n");
-        titleButton.style.fontSize = `${Math.max(0.65, 1 - (violations.length - 1) * 0.08)}rem`;
-        document.getElementById("violationOutput").value = violationContent.trim();
-      } else {
-        titleButton.textContent = "無違規";
-        titleButton.style.fontSize = "1rem";
-        document.getElementById("violationOutput").value = "";
-      }
+      const hasViolations = violationDetailEl.children.length > 0;
+      titleButton.textContent = hasViolations ? "有違規" : "無資料";
+      if (hasViolations) alert("偵測到違規內容，請查看右側違規詳細");
     }
   </script>
 </body>
