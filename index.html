@@ -61,9 +61,10 @@
       <button onclick="toggleViolationDetail()" id="violationTitle">無資料</button>
     </div>
 
-    <div class="flex-1 relative mt-2">
-      <div id="formattedOutput" class="w-full h-[95%] bg-[#1a1a1a] p-4 text-white text-sm leading-tight whitespace-pre-wrap overflow-auto"></div>
-      <div id="violationDetail" class="absolute top-4 right-4 bg-white text-red-600 p-4 rounded shadow hidden w-96 max-h-[60%] overflow-auto">
+    <!-- ✅ 修正後的區塊 -->
+    <div class="flex-1 relative mt-2 overflow-hidden">
+      <div id="formattedOutput" class="absolute inset-0 bg-[#1a1a1a] p-4 text-white text-sm leading-tight whitespace-pre-wrap overflow-auto"></div>
+      <div id="violationDetail" class="absolute top-4 right-4 bg-white text-red-600 p-4 rounded shadow hidden w-96 max-h-[60%] overflow-auto z-10">
         <h2 class="font-semibold text-black mb-2">違規詳細</h2>
         <div id="violationOutput" class="space-y-2"></div>
       </div>
